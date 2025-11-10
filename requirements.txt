@@ -1,0 +1,8 @@
+google-adk
+google-generativeai
+pinecone
+python-dotenv
+groq
+fastapi
+uvicorn
+python-multipart
