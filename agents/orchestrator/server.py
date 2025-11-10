@@ -16,8 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add session_id to query request
 class QueryRequest(BaseModel):
     query: str
+    session_id: str = None
 
 @app.get("/")
 def root():
@@ -57,11 +59,13 @@ async def upload_audio(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
 @app.post("/query")
 def query(request: QueryRequest):
     """Query memories and get answer"""
     try:
-        result = query_memory_tool(request.query)
+        result = query_memory_tool(request.query, request.session_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

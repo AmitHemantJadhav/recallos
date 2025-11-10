@@ -1,2 +1,138 @@
-/.env
-/venv
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+*.spec
+*.log
+*.out
+*.tmp
+*.pid
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+ENV/
+env.bak/
+env.local/
+pip-wheel-metadata/
+*.egg
+
+# Jupyter / IPython
+.ipynb_checkpoints/
+.profile/
+.pytest_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ============================================================
+# Google Cloud / Keys
+# ============================================================
+# GCP credentials & secrets
+*.json
+!requirements.txt
+!package.json
+# Keep only public JSONs like config examples
+
+# Cloud SDK / Service Accounts
+.gcloud/
+*.key.json
+credentials.json
+service-account.json
+speech-key.json
+
+# ============================================================
+# Docker
+# ============================================================
+Dockerfile~
+.dockerignore~
+docker-compose*.yml
+*.tar
+*.bak
+*.old
+*.cache
+*.log
+
+# ============================================================
+# Environment & Config
+# ============================================================
+.env
+.env.*
+!.env.example
+*.yaml
+*.yml
+config.json
+config.local.json
+secrets.json
+credentials/
+*.pem
+*.crt
+*.key
+
+# ============================================================
+# Audio / Model Data
+# ============================================================
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.zip
+*.tar.gz
+*.pth
+*.pt
+*.bin
+*.ckpt
+*.h5
+
+# ============================================================
+# Node / Frontend (if hybrid)
+# ============================================================
+node_modules/
+.npm/
+.next/
+.cache/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+pnpm-debug.log
+
+# ============================================================
+# Miscellaneous
+# ============================================================
+tmp/
+logs/
+output/
+uploads/
+sessions/
+__temp__/
+__test__/
+*.bak
+*.backup
+*.sqlite3
+*.db
+*.sql
+
+# ============================================================
+# Local artifacts
+# ============================================================
+

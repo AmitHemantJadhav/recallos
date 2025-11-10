@@ -1,14 +1,12 @@
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent / 'agents' / 'orchestrator'))
-
-from main import (
+from agents.orchestrator.main import (
     transcribe_audio,
-    store_memory, 
+    store_memory,
     search_memory,
     answer_question,
     upload_and_process_audio,
-    query_memory_tool
+    query_memory_tool,
+    intelligent_query,
+    orchestrator,
 )
 import time
 

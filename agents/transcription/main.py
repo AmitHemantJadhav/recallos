@@ -4,16 +4,20 @@ root_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(root_dir))
 
 from google.adk import Agent
-from groq import Groq
+from google.cloud import speech
 from dotenv import load_dotenv
 import os
+import io
 
 load_dotenv()
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Initialize Google Speech client
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+speech_client = speech.SpeechClient()
 
 def transcribe_audio(audio_path: str) -> dict:
     """
-    Transcribe audio file using Groq Whisper.
+    Transcribe audio using Google Cloud Speech-to-Text.
     
     Args:
         audio_path: Path to the audio file
@@ -21,50 +25,85 @@ def transcribe_audio(audio_path: str) -> dict:
     Returns:
         Dictionary with transcript and segments
     """
-    print(f"🎙️ Transcribing: {audio_path}")
+    print(f"🎙️ Transcribing with Google Speech-to-Text: {audio_path}")
     
     try:
+        # Read audio file
         with open(audio_path, "rb") as audio_file:
-            transcription = groq_client.audio.transcriptions.create(
-                file=(audio_path, audio_file.read()),
-                model="whisper-large-v3",
-                response_format="verbose_json",
-                temperature=0.0
-            )
+            content = audio_file.read()
         
+        # Configure recognition
+        audio = speech.RecognitionAudio(content=content)
+        
+        config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding.MP3,
+            language_code="en-US",
+            enable_word_time_offsets=True,
+            enable_automatic_punctuation=True,
+            enable_speaker_diarization=True,  # Speaker identification!
+            diarization_speaker_count=2,  # Assume 2 speakers
+            model="latest_long",  # Best model for long audio
+        )
+        
+        print("   Sending to Google Speech API...")
+        
+        # Perform transcription
+        response = speech_client.recognize(config=config, audio=audio)
+        
+        # Extract results with speaker info
+        full_text = ""
         segments = []
-        if hasattr(transcription, 'segments') and transcription.segments:
-            for seg in transcription.segments:
+        
+        for i, result in enumerate(response.results):
+            alternative = result.alternatives[0]
+            full_text += alternative.transcript + " "
+            
+            # Extract word-level timestamps and speaker tags
+            if alternative.words:
+                segment_text = alternative.transcript
+                start_time = alternative.words[0].start_time.total_seconds()
+                end_time = alternative.words[-1].end_time.total_seconds()
+                
+                # Get speaker tag from first word
+                speaker_tag = getattr(alternative.words[0], 'speaker_tag', 1)
+                
                 segments.append({
-                    "text": seg['text'],
-                    "start": seg['start'],
-                    "end": seg['end'],
-                    "speaker": "Speaker 1"
+                    "text": segment_text,
+                    "start": start_time,
+                    "end": end_time,
+                    "speaker": f"Speaker {speaker_tag}"
                 })
         
         duration = segments[-1]["end"] if segments else 0
         
         result = {
-            "text": transcription.text,
+            "text": full_text.strip(),
             "segments": segments,
-            "language": transcription.language if hasattr(transcription, 'language') else "en",
+            "language": "en",
             "duration": duration
         }
         
-        print(f"✅ Transcribed {len(segments)} segments ({duration:.1f}s)")
+        print(f"✅ Transcribed {len(segments)} segments ({duration:.1f}s) with Google Speech-to-Text")
+        print(f"   Detected speakers: {len(set(s['speaker'] for s in segments))}")
         return result
         
     except FileNotFoundError:
-        return {"error": f"Audio file not found: {audio_path}"}
+        error = f"Audio file not found: {audio_path}"
+        print(f"❌ {error}")
+        return {"error": error}
     except Exception as e:
-        return {"error": f"Transcription failed: {str(e)}"}
+        error = f"Google Speech transcription failed: {str(e)}"
+        print(f"❌ {error}")
+        import traceback
+        traceback.print_exc()
+        return {"error": error}
 
 # Create the agent
 transcription_agent = Agent(
     model='gemini-2.0-flash-exp',
     name='transcription_agent',
-    description='Transcribes audio files using Groq Whisper',
+    description='Transcribes audio files using Google Cloud Speech-to-Text with speaker diarization',
     tools=[transcribe_audio]
 )
 
-print("✅ Transcription Agent initialized")
+print("✅ Transcription Agent initialized with Google Speech-to-Text")
