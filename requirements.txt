@@ -3,7 +3,6 @@ google-generativeai
 google-cloud-speech
 google-cloud-storage
 google-cloud-firestore
-google-cloud-logging
 pinecone
 python-dotenv
 fastapi

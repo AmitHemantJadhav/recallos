@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from agents.orchestrator.main import upload_and_process_audio, query_memory_tool
 import os
 import tempfile
+from main import intelligent_query, find_cross_conversation_patterns
 
 app = FastAPI(title="RecallOS API")
 
@@ -66,6 +67,29 @@ def query(request: QueryRequest):
     """Query memories and get answer"""
     try:
         result = query_memory_tool(request.query, request.session_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/intelligent-query")
+def intelligent_query_endpoint(request: QueryRequest):
+    """
+    Intelligent query with autonomous agent planning and execution.
+    Uses coordinator to decide which agents to use.
+    """
+    try:
+        result = intelligent_query(request.query)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/insights")
+def cross_conversation_insights(request: QueryRequest):
+    """
+    NOVEL FEATURE: Find patterns across ALL conversations.
+    """
+    try:
+        result = find_cross_conversation_patterns(request.query)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

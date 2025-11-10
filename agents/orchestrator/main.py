@@ -1,12 +1,33 @@
-# --- clean imports: no sys.path hacks ---
-from ..coordinator.agent import plan_execution, negotiate_resources
-from ..insights.agent import find_cross_conversation_patterns, get_topic_evolution
+import sys
+from pathlib import Path
+import importlib.util
 
+# Add root to path
+root_dir = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(root_dir))
+
+# Import coordinator functions using importlib
+coordinator_path = Path(__file__).parent.parent / 'coordinator' / 'agent.py'
+coordinator_spec = importlib.util.spec_from_file_location("coordinator_module", coordinator_path)
+coordinator_module = importlib.util.module_from_spec(coordinator_spec)
+coordinator_spec.loader.exec_module(coordinator_module)
+plan_execution = coordinator_module.plan_execution
+negotiate_resources = coordinator_module.negotiate_resources
+
+# Import insights functions using importlib
+insights_path = Path(__file__).parent.parent / 'insights' / 'agent.py'
+insights_spec = importlib.util.spec_from_file_location("insights_module", insights_path)
+insights_module = importlib.util.module_from_spec(insights_spec)
+insights_spec.loader.exec_module(insights_module)
+find_cross_conversation_patterns = insights_module.find_cross_conversation_patterns
+get_topic_evolution = insights_module.get_topic_evolution
+
+# Now import everything else
 from google.adk import Agent
 from shared.pinecone_client import PineconeClient
 from shared.embeddings import get_document_embedding, get_query_embedding
 from shared.google_services import upload_to_storage, save_session, get_session, log_agent_action
-from groq import Groq
+from google.cloud import speech
 import google.generativeai as genai
 from dotenv import load_dotenv
 import os
@@ -15,12 +36,12 @@ from datetime import datetime
 import json
 import time
 
-
 load_dotenv()
 
 # Initialize all clients
 db = PineconeClient()
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/app/speech-key.json")
+speech_client = speech.SpeechClient()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
@@ -28,35 +49,92 @@ gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
 # ==================== TRANSCRIPTION FUNCTIONS ====================
 
-def transcribe_audio(audio_path: str) -> dict:
-    """Transcribe audio file using Groq Whisper."""
+def transcribe_audio(audio_path: str, gcs_uri: str = None) -> dict:
+    """
+    Transcribe audio using Google Cloud Speech-to-Text.
+    If gcs_uri provided, use long-running operation for large files.
+    """
     print(f"🎙️ Transcribing: {audio_path}")
     
     try:
-        with open(audio_path, "rb") as audio_file:
-            transcription = groq_client.audio.transcriptions.create(
-                file=(audio_path, audio_file.read()),
-                model="whisper-large-v3",
-                response_format="verbose_json",
-                temperature=0.0
+        # If GCS URI provided, use long-running operation (no size limit)
+        if gcs_uri:
+            print(f"   Using GCS URI: {gcs_uri}")
+            
+            audio = speech.RecognitionAudio(uri=gcs_uri)
+            
+            diarization_config = speech.SpeakerDiarizationConfig(
+                enable_speaker_diarization=True,
+                min_speaker_count=1,
+                max_speaker_count=4,
             )
+            
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.MP3,
+                language_code="en-US",
+                enable_word_time_offsets=True,
+                enable_automatic_punctuation=True,
+                diarization_config=diarization_config,
+                model="latest_long",
+            )
+            
+            print("   Starting long-running transcription...")
+            operation = speech_client.long_running_recognize(config=config, audio=audio)
+            print("   Waiting for operation to complete...")
+            response = operation.result(timeout=300)
+            
+        else:
+            # For small files, use synchronous recognition
+            with open(audio_path, "rb") as audio_file:
+                content = audio_file.read()
+            
+            audio = speech.RecognitionAudio(content=content)
+            
+            diarization_config = speech.SpeakerDiarizationConfig(
+                enable_speaker_diarization=True,
+                min_speaker_count=1,
+                max_speaker_count=4,
+            )
+            
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.MP3,
+                language_code="en-US",
+                enable_word_time_offsets=True,
+                enable_automatic_punctuation=True,
+                diarization_config=diarization_config,
+                model="latest_long",
+            )
+            
+            print("   Sending to Google Speech API...")
+            response = speech_client.recognize(config=config, audio=audio)
         
+        # Extract results (same for both methods)
+        full_text = ""
         segments = []
-        if hasattr(transcription, 'segments') and transcription.segments:
-            for seg in transcription.segments:
+        
+        for i, result in enumerate(response.results):
+            alternative = result.alternatives[0]
+            full_text += alternative.transcript + " "
+            
+            if alternative.words:
+                segment_text = alternative.transcript
+                start_time = alternative.words[0].start_time.total_seconds()
+                end_time = alternative.words[-1].end_time.total_seconds()
+                speaker_tag = getattr(alternative.words[0], 'speaker_tag', 1)
+                
                 segments.append({
-                    "text": seg['text'],
-                    "start": seg['start'],
-                    "end": seg['end'],
-                    "speaker": "Speaker 1"
+                    "text": segment_text,
+                    "start": start_time,
+                    "end": end_time,
+                    "speaker": f"Speaker {speaker_tag}"
                 })
         
         duration = segments[-1]["end"] if segments else 0
         
         result = {
-            "text": transcription.text,
+            "text": full_text.strip(),
             "segments": segments,
-            "language": transcription.language if hasattr(transcription, 'language') else "en",
+            "language": "en",
             "duration": duration
         }
         
@@ -64,7 +142,9 @@ def transcribe_audio(audio_path: str) -> dict:
         return result
         
     except Exception as e:
-        return {"error": f"Transcription failed: {str(e)}"}
+        import traceback
+        traceback.print_exc()
+        return {"error": f"Google Speech transcription failed: {str(e)}"}
 
 # ==================== MEMORY FUNCTIONS ====================
 
@@ -211,7 +291,7 @@ def upload_and_process_audio(audio_path: str) -> dict:
         
         for attempt in range(max_retries):
             try:
-                transcript_data = transcribe_audio(audio_path)
+                transcript_data = transcribe_audio(audio_path, gcs_uri=gcs_url)
                 
                 if "error" not in transcript_data:
                     log_agent_action('transcription', 'success', {
