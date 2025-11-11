@@ -20,7 +20,7 @@ This goes beyond single-file analysis to provide meta-insights about your entire
 
 - **Demo**: [[Check out here]](https://recallos-ui.vercel.app/)
 - **API**: https://recallos-api-490598019887.us-central1.run.app
-- **Video Demo**: [YouTube link - create this next]
+- **Video Demo**: [[Watch](https://youtu.be/-ISj6_gXWlk)]
 
 ## 🏗️ Architecture
 
