@@ -89,9 +89,7 @@ This goes beyond single-file analysis to provide meta-insights about your entire
 - **Speaker diarization** for multi-speaker audio
 - **Scalable architecture** ready for production
 
-## 🎬 Demo Video
 
-[Embed YouTube video here - create next]
 
 ## 📝 How It Works
 
@@ -99,9 +97,7 @@ This goes beyond single-file analysis to provide meta-insights about your entire
 2. **Query**: Coordinator plans → Agents execute → Synthesis responds
 3. **Insights**: Cross-file analysis → Pattern detection → Actionable insights
 
-## 🚀 Getting Started
 
-[Add setup instructions]
 
 ## 🏅 Built For
 
