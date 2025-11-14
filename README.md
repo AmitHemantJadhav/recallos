@@ -1,6 +1,6 @@
 # 🎙️ RecallOS - AI-Powered Audio Memory System
 
-> Winner submission for Google Cloud Run Hackathon - AI Agents Category
+> Winner submission for Hackathon
 
 ## 🏆 What Makes RecallOS Special
 
